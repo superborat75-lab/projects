@@ -8,7 +8,14 @@ from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from services.erp_client import erp_post, ERPClientError, get_doc_info
+from services.erp_client import (
+    erp_post,
+    ERPClientError,
+    get_doc_info,
+    log_info,
+    log_debug,
+    log_error,
+)
 
 
 class ERPOrdersError(Exception):
@@ -35,6 +42,7 @@ class OrderRow:
 def fetch_so_docs(for_date: date) -> List[Dict[str, Any]]:
     """
     Вика So.get по for_date и връща пълните SO документи (dict-ове).
+
     Очакван формат на отговора от ERP:
 
       {
@@ -54,7 +62,7 @@ def fetch_so_docs(for_date: date) -> List[Dict[str, Any]]:
     payload = {"data": [{"for_date": for_date.isoformat()}]}
     try:
         raw = erp_post("So.get", payload)
-        print("🧾 RAW от So.get:", raw)
+        log_debug(f"[SO] RAW от So.get: {raw}")
     except ERPClientError as e:
         raise ERPOrdersError(f"Грешка при So.get: {e}")
 
@@ -68,12 +76,14 @@ def fetch_so_docs(for_date: date) -> List[Dict[str, Any]]:
             result = raw["result"]
         else:
             result = []
+    else:
+        result = []
 
-        for doc in result:
-            if isinstance(doc, dict):
-                docs.append(doc)
+    for doc in result:
+        if isinstance(doc, dict):
+            docs.append(doc)
 
-    print(f"🔍 Извлякохме {len(docs)} продажби (SO документи) от So.get")
+    log_info(f"🔍 Извлякохме {len(docs)} продажби (SO документи) от So.get за дата {for_date.isoformat()}")
     return docs
 
 
@@ -89,8 +99,10 @@ def fetch_sales_rows_for_date(for_date: date) -> List[Dict[str, Any]]:
 
     store_out_ids: List[int] = []
     for doc in so_docs:
+        so_id = doc.get("id")
         rels = doc.get("rel_trans")
         if not isinstance(rels, list):
+            log_debug(f"[SO] Документ {so_id} няма rel_trans или не е списък.")
             continue
         for rel in rels:
             if not isinstance(rel, dict):
@@ -99,13 +111,15 @@ def fetch_sales_rows_for_date(for_date: date) -> List[Dict[str, Any]]:
                 try:
                     sid = int(rel.get("rel_trans_id"))
                     store_out_ids.append(sid)
+                    log_debug(f"[SO] SO {so_id} → store_out rel_trans_id={sid}")
                 except (TypeError, ValueError):
+                    log_error(f"[SO] Невалидно store_out rel_trans_id в {rel}")
                     continue
 
-    print(f"📦 Извлякохме {len(store_out_ids)} store_out ID-та от So.get: {store_out_ids}")
+    log_info(f"📦 Извлякохме {len(store_out_ids)} store_out ID-та от So.get: {store_out_ids}")
 
     if not store_out_ids:
-        print("⚠️ Няма нито едно store_out.rel_trans_id – няма какво да дадем на DocInfo.get")
+        log_info("⚠️ Няма нито едно store_out.rel_trans_id – няма какво да дадем на DocInfo.get")
         return []
 
     all_rows: List[Dict[str, Any]] = []
@@ -115,25 +129,25 @@ def fetch_sales_rows_for_date(for_date: date) -> List[Dict[str, Any]]:
         try:
             rows = get_doc_info([sid])
         except ERPClientError as e:
-            print(f"⚠️ DocInfo.get грешка за store_out {sid}: {e}")
+            log_error(f"[DocInfo] Грешка при DocInfo.get за store_out {sid}: {e}")
             continue
 
         if not isinstance(rows, list):
-            print(f"⚠️ DocInfo.get за {sid} не върна списък (rows) → {rows}")
+            log_error(f"[DocInfo] DocInfo.get за {sid} не върна списък (rows) → {rows}")
             continue
 
-        print(f"   ↳ store_out {sid} върна {len(rows)} rows")
+        log_info(f"   ↳ store_out {sid} върна {len(rows)} rows")
         all_rows.extend(rows)
 
-    print(f"🧾 Общо DocInfo rows за дата {for_date.isoformat()}: {len(all_rows)}")
+    log_info(f"🧾 Общо DocInfo rows за дата {for_date.isoformat()}: {len(all_rows)}")
     if all_rows:
         sample = all_rows[0]
-        print("🔎 Примерен row от DocInfo:", {
+        log_debug("🔎 Примерен row от DocInfo: " + str({
             "delivery_full_address": sample.get("delivery_full_address"),
             "to_nm": sample.get("to_nm"),
             "num": sample.get("num"),
             "qty/confirmed_quantity": sample.get("qty") or sample.get("confirmed_quantity"),
-        })
+        }))
 
     return all_rows
 
@@ -159,6 +173,8 @@ def _to_order_row(raw: Dict[str, Any]) -> Optional[OrderRow]:
         or ""
     )
     if not address:
+        # без адрес няма спирка
+        log_debug(f"[MAP] Пропускам row без адрес: {raw}")
         return None
 
     client = (
@@ -259,6 +275,7 @@ def build_stops_from_rows(raw_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]
             }
         )
 
+    log_info(f"📦 Сглобихме {len(stops)} спирки (уникални адреси) от {len(raw_rows)} DocInfo rows.")
     return stops
 
 
@@ -279,6 +296,8 @@ def write_deliveries_csv_from_stops(stops: List[Dict[str, Any]], path: Path) -> 
         writer.writerow(["name", "address"])
         for stop in stops:
             writer.writerow([stop["name"], stop["address"]])
+
+    log_info(f"📄 Записах deliveries.csv ({len(stops)} реда) в {path}")
 
 
 def generate_deliveries_for_date(for_date: date, deliveries_csv_path: Path) -> List[Dict[str, Any]]:
