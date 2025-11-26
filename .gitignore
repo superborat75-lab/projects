@@ -1,0 +1,94 @@
+# Операционни системи
+####################
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Виртуални среди
+#####################
+# Общи директории за виртуални среди
+/venv
+/env
+/ENV
+.venv
+
+# Pip environments (conda environments са по-надолу)
+/pip-wheel-cache
+.pip/
+
+# Инсталирани пакети и зависимости
+####################################
+# Зависимости от пакети/инсталации (когато са инсталирани за разработване)
+*.egg-info/
+.installed.cfg
+/build/
+/dist/
+
+# Python byte-code (компилирани) файлове
+#####################################
+*.pyc
+__pycache__/
+*.$py.class
+
+# IDE и редактори
+#####################
+# PyCharm/IntelliJ
+.idea/
+.vscode/
+
+# Jupyter/IPython Notebooks
+.ipynb_checkpoints
+
+# Spyder
+.spyproject/
+
+# VS Code/TextMate/SublimeText
+# Разширения: .tm_properties, .sublime-* (само ако не са част от проекта)
+# .vscode/ се покрива по-горе
+
+# Тестове и покритие
+#####################
+# Coverage reports
+.coverage
+.tox/
+/htmlcov/
+
+# Python Debugger
+*.pdg
+
+# Conda
+##########
+# Conda environments
+/envs/
+
+# Conda build artifacts
+/conda-bld/
+
+# Logs and databases
+#######################
+*.log
+*.sqlite
+*.db
+
+# Temporary files
+##################
+*~
+*.bak
+*.swp
+*.tmp
+# Ако използвате Django, може да имате още
+db.sqlite3
+
+# Директории за данни (ако се генерират локално)
+###############################################
+# /data/
+
+# Специфични за потребителя конфигурации (ако не са необходими за всички)
+######################################################################
+# .settings.ini
+# settings_local.py
+*.env
+*.csv
+*.xlsx
+*.xls
+*.json
