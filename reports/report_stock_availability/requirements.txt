@@ -1,0 +1,18 @@
+# requirements.txt — report_stock_availability
+
+# ENV & HTTP
+python-dotenv>=1.0,<2
+requests>=2.31,<3
+
+# Данни
+polars>=0.20,<2
+# pandas>=2.2,<3            # (по избор, ако наистина ще го ползваш редом с Polars)
+
+# HTML templating + секси имейл (inline CSS!)
+Jinja2>=3.1,<4
+premailer>=3.10,<4          # инлайнва CSS → работи в Gmail/Outlook
+cssutils>=2.8,<3            # бекенд на premailer; пинваме версия за стабилност
+
+# Локали/дати (по избор, но полезно за форматиране 1 234,56 и дати)
+Babel>=2.12,<3
+tzdata>=2024.1,<2026        # полезно за Alpine/Windows; на Linux често не е нужно

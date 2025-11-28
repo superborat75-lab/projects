@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="bg">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Прогноза за изчерпване на наличности</title>
+  <!-- Light, email-friendly styles. Avoid CSS variables, color-mix, sticky headers, and heavy layouts. -->
+  <style>
+    body { background:#ffffff; color:#111111; margin:0; padding:16px; font-family: Arial, Helvetica, sans-serif; font-size:14px; line-height:1.4; }
+    h1 { margin:0 0 6px 0; font-size:20px; color:#111111; }
+    .meta { color:#555555; margin:0 0 12px 0; }
+    .legend { margin:10px 0 16px 0; color:#444444; }
+    .legend .pill { display:inline-block; margin-right:10px; padding:4px 8px; border:1px solid #dddddd; border-radius:999px; background:#f7f7f7; }
+
+    table { width:100%; border-collapse:collapse; }
+    thead th { background:#f5f5f5; color:#222222; text-align:center; padding:8px 10px; border:1px solid #dddddd; }
+    tbody td { padding:8px 10px; border:1px solid #eeeeee; vertical-align:top; }
+
+    /* Fallback classes for clients that support <style>. Rows also receive inline background via Jinja for maximum compatibility. */
+    tr.row-urgent { background:#fff5f6; }
+    tr.row-attention { background:#fffbeb; }
+    tr.row-ok { background:#ffffff; }
+
+    .num { text-align:right; white-space:nowrap; font-variant-numeric: tabular-nums; }
+    .date { white-space:nowrap; }
+
+    .status-chip { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; font-weight:bold; border:1px solid #cccccc; }
+    .status-urgent { background:#fde8ea; color:#8a0b1a; border-color:#f3c4c9; }
+    .status-attention { background:#fff4cc; color:#7a5a00; border-color:#f5dfa3; }
+    .status-ok { background:#e9f9ef; color:#0b5d3e; border-color:#c7edd6; }
+
+    /* Make table scrollable on small screens when viewed in browser */
+    .table-wrap { overflow:auto; -webkit-overflow-scrolling:touch; border:1px solid #e6e6e6; border-radius:6px; }
+  </style>
+</head>
+<body style="background:#ffffff; color:#111111; margin:0; padding:16px; font-family: Arial, Helvetica, sans-serif; font-size:14px; line-height:1.4;">
+  <h1 style="margin:0 0 6px 0; font-size:20px; color:#111111;">Прогноза за изчерпване на наличности</h1>
+  <div class="meta" style="color:#555555; margin:0 0 12px 0;">
+    Генериран: {{ generated_at }} · Хоризонт: {{ horizon_days }} дни · Общо lead time: {{ lead_total_days }} дни · Общо артикули: {{ count_total }} · 🟥 {{ count_urgent }} · 🟨 {{ count_attention }} · 🟩 {{ count_ok }}
+  </div>
+  <div class="legend" style="margin:10px 0 16px 0; color:#444444;">
+    <span class="pill" style="display:inline-block; margin-right:10px; padding:4px 8px; border:1px solid #dddddd; border-radius:999px; background:#f7f7f7;">🟥 Изчерпване ≤ общ lead time (спешно)</span>
+    <span class="pill" style="display:inline-block; margin-right:10px; padding:4px 8px; border:1px solid #dddddd; border-radius:999px; background:#f7f7f7;">🟨 Изчерпване в рамките на хоризонта (наблюдение)</span>
+    <span class="pill" style="display:inline-block; margin-right:10px; padding:4px 8px; border:1px solid #dddddd; border-radius:999px; background:#f7f7f7;">🟩 Няма риск (ok)</span>
+  </div>
+
+  <div class="table-wrap" style="overflow:auto; -webkit-overflow-scrolling:touch; border:1px solid #e6e6e6; border-radius:6px;">
+    <table role="table" aria-label="Прогноза за изчерпване на наличности" style="width:100%; border-collapse:collapse;">
+      <thead>
+        <tr>
+          <th style="background:#f5f5f5; color:#222222; text-align:center; padding:8px 10px; border:1px solid #dddddd;">Статус</th>
+          <th style="background:#f5f5f5; color:#222222; text-align:center; padding:8px 10px; border:1px solid #dddddd;">Код</th>
+          <th style="background:#f5f5f5; color:#222222; text-align:center; padding:8px 10px; border:1px solid #dddddd;">Артикул</th>
+          <th style="background:#f5f5f5; color:#222222; text-align:center; padding:8px 10px; border:1px solid #dddddd; white-space:nowrap;">Наличност</th>
+          <th style="background:#f5f5f5; color:#222222; text-align:center; padding:8px 10px; border:1px solid #dddddd; white-space:nowrap;">Среднодневни</th>
+          <th style="background:#f5f5f5; color:#222222; text-align:center; padding:8px 10px; border:1px solid #dddddd; white-space:nowrap;">Месеци до свършване</th>
+          <th style="background:#f5f5f5; color:#222222; text-align:center; padding:8px 10px; border:1px solid #dddddd; white-space:nowrap;">Дата изчерпване</th>
+          <th style="background:#f5f5f5; color:#222222; text-align:center; padding:8px 10px; border:1px solid #dddddd; white-space:nowrap;">Дата поръчка</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in forecast %}
+        {% set st = (r.status or 'ok') %}
+        {% set row_bg = '#ffffff' %}
+        {% if st == 'urgent' %}{% set row_bg = '#fff5f6' %}{% elif st == 'attention' %}{% set row_bg = '#fffbeb' %}{% else %}{% set row_bg = '#ffffff' %}{% endif %}
+        <tr class="row-{{ st }}" style="background: {{ row_bg }};">
+          <td style="padding:8px 10px; border:1px solid #eeeeee; text-align:center;">
+            {% if st == 'urgent' %}
+            <span class="status-chip status-urgent" style="display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; font-weight:bold; background:#fde8ea; color:#8a0b1a; border:1px solid #f3c4c9;">Спешно</span>
+            {% elif st == 'attention' %}
+            <span class="status-chip status-attention" style="display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; font-weight:bold; background:#fff4cc; color:#7a5a00; border:1px solid #f5dfa3;">Внимание</span>
+            {% else %}
+            <span class="status-chip status-ok" style="display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; font-weight:bold; background:#e9f9ef; color:#0b5d3e; border:1px solid #c7edd6;">OK</span>
+            {% endif %}
+          </td>
+          <td style="padding:8px 10px; border:1px solid #eeeeee; text-align:center;">{{ r.sku }}</td>
+          <td style="padding:8px 10px; border:1px solid #eeeeee; text-align:center;">{{ r.item_name }}</td>
+          <td style="padding:8px 10px; border:1px solid #eeeeee; text-align:center; white-space:nowrap;">{{ r.on_hand | int_space }}</td>
+          <td style="padding:8px 10px; border:1px solid #eeeeee; text-align:center; white-space:nowrap;">{{ r.avg_daily | fmt_int }}</td>
+          <td style="padding:8px 10px; border:1px solid #eeeeee; text-align:center; white-space:nowrap;">{{ r.days_of_stock is not none and (r.days_of_stock | days_to_months) or '—' }}</td>
+          <td style="padding:8px 10px; border:1px solid #eeeeee; text-align:center; white-space:nowrap;">{{ r.depletion_date | fmt_date }}</td>
+          <td style="padding:8px 10px; border:1px solid #eeeeee; text-align:center; white-space:nowrap;">{{ r.order_date | fmt_date }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>

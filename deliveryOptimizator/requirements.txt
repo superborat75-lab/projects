@@ -1,0 +1,7 @@
+googlemaps
+numpy
+ratelimit
+ortools
+pandas
+python-dotenv
+shapely
